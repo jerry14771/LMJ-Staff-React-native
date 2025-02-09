@@ -6,9 +6,15 @@ import Header from './Header';
 import { useNavigation } from '@react-navigation/native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Toast from 'react-native-toast-message';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, runOnJS, interpolateColor } from 'react-native-reanimated';
 import configimage from '../../configimage';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+
+const statuses = ['Pending', 'Ongoing', 'Completed', 'Delivered'];
+const statusColors = { Pending: '#FFA500', Ongoing: '#1E90FF', Completed: '#32CD32', Delivered: '#FFD700', };
+
 
 const InvoiceDetail = ({ route }) => {
     const { invoice } = route.params;
@@ -19,6 +25,8 @@ const InvoiceDetail = ({ route }) => {
     const invoiceID = invoice.id;
     const phoneLogo = require('../../assets/phone_call.png');
     const navigation = useNavigation();
+    const [currentStatusIndex, setCurrentStatusIndex] = useState(invoice.status == "Pending" ? 0 : invoice.status == "Ongoing" ? 1 : invoice.status == "Completed" ? 2 : 3);
+    const translateX = useSharedValue(0);
 
     const handleImagePress = (index) => {
         setSelectedImageIndex(index);
@@ -47,6 +55,79 @@ const InvoiceDetail = ({ route }) => {
         return `${formattedDate.replace(/,/, '')}`;
     };
 
+
+
+    const updateStatus = (direction) => {
+        setCurrentStatusIndex((prevIndex) => {
+            const newIndex = Math.min(Math.max(prevIndex + direction, 0), statuses.length - 1);
+            if (newIndex !== prevIndex) {
+                const newStatus = statuses[newIndex];
+                callStatusChangeAPI(newStatus, invoiceID);
+            }
+            return newIndex;
+        });
+    };
+
+
+    const callStatusChangeAPI = async (status, invoiceID) => {
+        const url = `${config.BASE_URL}updateOrderStatus.php`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ "receiptID": invoiceID, "currentStatus": status }),
+        });
+        const result = await response.json();
+        if (result.message == 'Order status updated successfully') {
+            Toast.show({
+                type: 'success',
+                text1: 'Success 🎉',
+                text2: 'Order status updated successfully 👍',
+            });
+        } else {
+            Toast.show({
+                type: 'error',
+                text1: 'Error',
+                text2: result.error || 'Failed to update order status',
+            });
+        }
+    }
+
+    const swipeGesture = Gesture.Pan().onUpdate((event) => {
+        translateX.value = event.translationX;
+    }).onEnd(() => {
+        if (translateX.value < -SWIPE_THRESHOLD && currentStatusIndex > 0) {
+            runOnJS(updateStatus)(-1);
+        } else if (translateX.value > SWIPE_THRESHOLD && currentStatusIndex < statuses.length - 1) {
+            runOnJS(updateStatus)(1);
+        }
+        translateX.value = withSpring(0);
+    });
+
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: translateX.value }],
+    }));
+
+    const animatedStyle2 = useAnimatedStyle(() => {
+        const nextIndex = translateX.value < 0
+            ? Math.min(currentStatusIndex + 1, statuses.length - 1)
+            : Math.max(currentStatusIndex - 1, 0);
+
+        const backgroundColor = interpolateColor(
+            translateX.value,
+            [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
+            [
+                statusColors[statuses[nextIndex]],
+                statusColors[statuses[currentStatusIndex]],
+                statusColors[statuses[nextIndex]],
+            ]
+        );
+        return {
+            backgroundColor,
+        };
+    });
+
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <View style={styles.container}>
@@ -54,16 +135,12 @@ const InvoiceDetail = ({ route }) => {
                 <ScrollView contentContainerStyle={styles.scrollContainer}>
                     <View style={styles.headerContainer}>
                         <Text style={styles.title}>{invoice.name}</Text>
-                    </View>
-                    <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 5 }}>
-                        <Text style={[styles.detail, { fontSize: 18, fontWeight: "bold" }]}>Mobile: </Text>
-                        <TouchableOpacity style={{ flexDirection: "row", gap: 10, alignItems: "center" }} onPress={() => Linking.openURL(`tel:${invoice.mobile}`)}>
-                            <Text style={{ fontSize: 16, fontWeight: "normal", color: "white" }}>{invoice.mobile}</Text>
-                            <Image source={phoneLogo} style={{ height: 22, width: 22 }} />
-                        </TouchableOpacity>
+                        <View style={{ paddingHorizontal: 6, paddingVertical: 4, backgroundColor: "red", borderRadius: 10 }}>
+                            <Text style={{ color: "white", fontSize: 18, fontWeight: "800" }}>{invoice.invoice_number}</Text>
+                        </View>
                     </View>
 
-                    <Text style={[styles.detail, { fontSize: 18, fontWeight: "bold" }]}>Address: <Text style={{ fontSize: 16, fontWeight: "normal" }}>{invoice.address}</Text></Text>
+
                     <View style={styles.amountContainer}>
                         <View style={styles.amountRow}>
                             <Text style={styles.amountText}>Total Amount:</Text>
@@ -100,6 +177,20 @@ const InvoiceDetail = ({ route }) => {
 
                     <View style={{ alignItems: "flex-end", padding: 10 }}><Text style={{ color: "white", fontSize: 12 }} >Created on : {formatDate(invoice.createdAt)}</Text></View>
 
+
+
+                    <Animated.View style={[styles.swipeableContainer, animatedStyle2]}>
+                        <GestureDetector gesture={swipeGesture}>
+                            <Animated.View style={[styles.statusItem, animatedStyle]}>
+                                <Text style={styles.currentStatus}>{statuses[currentStatusIndex]}</Text>
+                            </Animated.View>
+                        </GestureDetector>
+                    </Animated.View>
+
+
+
+
+
                 </ScrollView>
             </View>
         </GestureHandlerRootView>
@@ -116,14 +207,14 @@ const styles = StyleSheet.create({
     },
     headerContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 10,
+        gap: 15
     },
     title: {
         fontSize: 24,
         fontWeight: '600',
-        color: '#ffffff',
+        color: 'white',
     },
     binLogo: {
         height: 30,

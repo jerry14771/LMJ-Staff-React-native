@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, TextInput,StyleSheet, Image } from 'react-native'
+import { View, Text, TouchableOpacity, TextInput,StyleSheet, Image, FlatList } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native'
 import config from '../../config'
@@ -9,12 +9,18 @@ import Header from './Header';
 const Home = () => {
   const navigation = useNavigation();
   const nameLogo = require('../../assets/driving_license.png');
+  const [filteredData, setFilteredData] = useState([]);
+  const [data, setData] = useState([]);
+  const pricelist = require('../../assets/price_list.png');
 
   useFocusEffect(
     React.useCallback(() => {
       checkuserAuthAccess();
+      checktodaysdata();
+
       return () => {
       checkuserAuthAccess();
+      checktodaysdata();
     };
     }, [])
   );
@@ -37,6 +43,60 @@ const Home = () => {
 
     }
   }
+  const checktodaysdata = async () => {
+    const url = `${config.BASE_URL}todaysDelivery.php`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(),
+        });
+        const result = await response.json();
+        if (result.status == "success") {
+            setData(result.data);
+            setFilteredData(result.data);
+        }
+  }
+
+
+  const TriangleCorner = ({ text }) => {
+    return (
+        <View style={styles.ribbonContainer}>
+            <View style={styles.triangleCorner} />
+            <Text style={styles.ribbonText}>{text}</Text>
+        </View>
+    );
+};
+
+
+
+
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity onPress={() => navigation.navigate('InvoiceDetail', { invoice: item })} style={{ margin: 10 }}>
+        <View style={styles.card}>
+            <TriangleCorner text={item.invoice_number} />
+            <Image source={pricelist} style={styles.image} />
+            <View style={{ flexShrink: 1, width:"100%"}}>
+                <Text style={styles.nameText}>
+                    Name: <Text style={styles.boldText}>{item.name}</Text>
+                </Text>
+                <Text style={styles.amountText}>
+                    Billing Amount: <Text style={styles.boldAmountText}>₹{item.totalAmount}</Text>
+                </Text>
+                <Text style={styles.amountText}>
+                    Paid Amount: <Text style={styles.boldAmountText}>₹{item.amountGiven}</Text>
+                </Text>
+                <View style={{ flexDirection:"row", gap:10}}>
+                    <Text style={styles.mobileText}>Status: </Text>
+                    <Text style={{ padding:5, backgroundColor:item.status=="Completed" ?'#32CD32': item.status=="Pending"? "#FFA500":item.status=="Ongoing"?'#1E90FF':'#FFD700', borderRadius:5, color:"white", fontWeight:"600"}}>{item.status}</Text>
+                </View>
+            </View>
+        </View>
+    </TouchableOpacity>
+);
+
 
   return (
     <View>
@@ -49,6 +109,19 @@ const Home = () => {
                     <Image source={nameLogo} style={styles.buttonImage} />
                     <Text style={styles.buttonText}>List All Orders (Filters)</Text>
                 </TouchableOpacity>
+
+                <View>
+                    <View>
+                        <View style={{ backgroundColor:"black", padding:5, margin:5, alignItems:"center", borderRadius:5}}>
+                            <Text style={{ color:"white", fontSize:18, fontWeight:"600" }}>Today's Delivery</Text>
+                        </View>
+                    </View>
+                    <FlatList
+                data={filteredData}
+                renderItem={renderItem}
+                keyExtractor={(item) => item.id.toString()}
+            />
+                </View>
     </View>
   )
 }
@@ -66,7 +139,7 @@ const styles = StyleSheet.create({
       justifyContent: 'space-evenly',
   },
   touchable: {
-      width: "100%",
+    //   width: "100%",
       backgroundColor: "white",
       padding: 10,
       borderRadius: 5,
@@ -78,7 +151,8 @@ const styles = StyleSheet.create({
       alignItems: "center",
       height:130,
       justifyContent:"center",
-      marginTop:10
+      marginTop:10,
+      margin:5
   },
   buttonImage: {
       height: 60,
@@ -150,6 +224,7 @@ const styles = StyleSheet.create({
       fontSize: 14,
       fontWeight: "600",
       marginBottom: 4,
+      fontSize:18
   },
   boldMobileText: {
       color: "#555",

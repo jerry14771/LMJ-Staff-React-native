@@ -85,12 +85,10 @@ const ListAllOrder = () => {
                     <Text style={styles.amountText}>
                         Paid Amount: <Text style={styles.boldAmountText}>₹{item.amountGiven}</Text>
                     </Text>
-                    <View style={{ flexDirection:"row", justifyContent:"space-between" }}>
-                        <Text style={styles.mobileText}>
-                            Mobile: <Text style={styles.boldMobileText}>{item.mobile}</Text>
-                        </Text>
-                        <Text style={styles.reciptStatus}>{item.status}</Text>
-                    </View>
+                    <View style={{ flexDirection:"row", gap:10}}>
+                                        <Text style={styles.mobileText}>Status: </Text>
+                                        <Text style={{ padding:5, backgroundColor:item.status=="Completed" ?'#32CD32': item.status=="Pending"? "#FFA500":item.status=="Ongoing"?'#1E90FF':'#FFD700', borderRadius:5, color:"white", fontWeight:"600"}}>{item.status}</Text>
+                                    </View>
                 </View>
             </View>
         </TouchableOpacity>
@@ -239,7 +237,7 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
         marginBottom: 4,
-       
+        fontSize:18
     },
     boldMobileText: {
         color: "#555",
